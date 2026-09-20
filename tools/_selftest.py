@@ -191,7 +191,7 @@ def main():
         # ------------------------------------------------------------------ 4
         print("\n[4] 参数校验（这些都不该真启动任务）")
         st, r = req("/api/run", data={"model": "edge", "music_kind": "path",
-                                      "music_path": r"G:\不存在\no.wav"})
+                                      "music_path": os.path.join(ROOT, "不存在", "no.wav")})
         chk(st == 400 and not r.get("ok"), "不存在的路径被拒绝", r.get("error"))
         st, r = req("/api/run", data={"model": "bailando", "dance": "不存在的序列"})
         chk(st == 400 and not r.get("ok"), "不存在的序列被拒绝", r.get("error"))

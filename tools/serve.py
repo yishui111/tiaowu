@@ -89,6 +89,8 @@ OUTPUT_SOURCES = [
 
 PROGRESS_RE = re.compile(r"^\s*\d+%\|")
 
+MAX_UPLOAD = 200 * 1024 * 1024   # 上传上限（音乐一般几十 MB，防误传大文件撑爆内存）
+
 # --------------------------------------------------------------------------- #
 # 全局状态
 # --------------------------------------------------------------------------- #
@@ -250,15 +252,22 @@ def _worker(job, plan):
         threading.Thread(target=_sweep, daemon=True).start()
 
 
-def start_job(model, title, plan):
-    """占一个任务号并起线程（供内部/扩展使用）。"""
+def start_job_with_id(model, jid, title, plan):
+    """登记任务并起工作线程。调用方必须已经在 LOCK 里占好 jid（见 /api/run）。"""
     with LOCK:
         if CURRENT["id"]:
             run = JOBS[CURRENT["id"]]
             return None, "已经有一个任务在跑了（%s）。" % run["title"]
-        SEQ[0] += 1
-        jid = "j%d" % SEQ[0]
-    return start_job_with_id(model, jid, title, plan)
+        job = {
+            "id": jid, "model": model, "title": title, "status": "running",
+            "lines": [], "videos": [], "error": "", "pid": None,
+            "started": time.time(), "ended": None,
+        }
+        JOBS[jid] = job
+        JOB_ORDER.append(jid)
+        CURRENT["id"] = jid
+    threading.Thread(target=_worker, args=(job, plan), daemon=True).start()
+    return job, None
 
 
 # --------------------------------------------------------------------------- #
@@ -615,6 +624,8 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0:
             return b""
+        if n > MAX_UPLOAD:
+            raise ValueError("上传内容 %dMB 超过上限 %dMB" % (n // 1024 // 1024, MAX_UPLOAD // 1024 // 1024))
         return self.rfile.read(n)
 
     def _json_body(self):
@@ -721,7 +732,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if u.path == "/api/upload":
-            raw = self._body()
+            try:
+                raw = self._body()
+            except ValueError as exc:
+                return self._json({"ok": False, "error": str(exc)}, 413)
             name = urllib.parse.unquote(self.headers.get("X-Filename") or "upload")
             stem = _safe_stem(name)
             ext = os.path.splitext(name)[1].lower()
@@ -778,23 +792,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "job": job["id"], "title": title, "notes": notes})
 
         return self._send(404, "not found", "text/plain")
-
-
-def start_job_with_id(model, jid, title, plan):
-    with LOCK:
-        if CURRENT["id"]:
-            run = JOBS[CURRENT["id"]]
-            return None, "已经有一个任务在跑了（%s）。" % run["title"]
-        job = {
-            "id": jid, "model": model, "title": title, "status": "running",
-            "lines": [], "videos": [], "error": "", "pid": None,
-            "started": time.time(), "ended": None,
-        }
-        JOBS[jid] = job
-        JOB_ORDER.append(jid)
-        CURRENT["id"] = jid
-    threading.Thread(target=_worker, args=(job, plan), daemon=True).start()
-    return job, None
 
 
 # --------------------------------------------------------------------------- #
