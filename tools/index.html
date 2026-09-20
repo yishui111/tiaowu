@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>音乐驱动 3D 舞蹈生成 · 本地工作台</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --panel2:#eef0f4; --line:#dfe3ea;
+  --fg:#1b1f27; --fg2:#5b6472; --fg3:#8b94a3;
+  --accent:#2f6df6; --accent2:#e8f0ff;
+  --ok:#128a5b; --warn:#b06a00; --err:#c0392b;
+  --term:#1a1d23; --termfg:#d8dee9; --termln:#2a2f38;
+  --radius:12px;
+}
+:root[data-theme="dark"]{
+  --bg:#14161a; --panel:#1c1f26; --panel2:#232730; --line:#2f343f;
+  --fg:#e8ecf2; --fg2:#a5aebd; --fg3:#78828f;
+  --accent:#5b8cff; --accent2:#22304d;
+  --ok:#3ddc97; --warn:#f0b429; --err:#ff6b6b;
+  --term:#101317; --termfg:#cfd6e2; --termln:#22262e;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161a; --panel:#1c1f26; --panel2:#232730; --line:#2f343f;
+    --fg:#e8ecf2; --fg2:#a5aebd; --fg3:#78828f;
+    --accent:#5b8cff; --accent2:#22304d;
+    --ok:#3ddc97; --warn:#f0b429; --err:#ff6b6b;
+    --term:#101317; --termfg:#cfd6e2; --termln:#22262e;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font:15px/1.6 "Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+
+/* ---------- header ---------- */
+header{
+  position:sticky;top:0;z-index:20;background:var(--panel);
+  border-bottom:1px solid var(--line);
+}
+.hd{max-width:1180px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:17px;letter-spacing:.2px}
+.brand small{display:block;font-weight:400;font-size:12px;color:var(--fg3);letter-spacing:0}
+.spacer{flex:1}
+.pill{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--fg2);
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--fg3)}
+.dot.idle{background:var(--ok)}
+.dot.busy{background:var(--warn);animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.25}}
+
+/* ---------- tabs ---------- */
+nav.tabs{display:flex;gap:4px;max-width:1180px;margin:0 auto;padding:0 20px;flex-wrap:wrap}
+nav.tabs button{
+  appearance:none;border:0;background:transparent;color:var(--fg2);cursor:pointer;
+  padding:10px 15px;font:inherit;font-size:14px;border-bottom:2px solid transparent;
+}
+nav.tabs button:hover{color:var(--fg)}
+nav.tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+/* ---------- generic ---------- */
+h2{font-size:20px;margin:28px 0 6px}
+h3{font-size:16px;margin:22px 0 8px}
+p{margin:8px 0;color:var(--fg2)}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:20px;margin:14px 0;
+}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.tag{
+  display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;
+  background:var(--accent2);color:var(--accent);border:1px solid transparent;
+}
+.tag.gray{background:var(--panel2);color:var(--fg2)}
+.tag.ok{background:transparent;color:var(--ok);border-color:var(--ok)}
+.tag.warn{background:transparent;color:var(--warn);border-color:var(--warn)}
+.muted{color:var(--fg3);font-size:13px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:10px 0}
+.kv dt{color:var(--fg3);white-space:nowrap}
+.kv dd{margin:0;color:var(--fg2)}
+ul.tight{margin:8px 0;padding-left:20px;color:var(--fg2);font-size:14px}
+ul.tight li{margin:4px 0}
+
+/* ---------- form ---------- */
+label.fl{display:block;font-size:13px;color:var(--fg3);margin:16px 0 6px}
+.seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+.seg button{
+  appearance:none;border:0;background:transparent;color:var(--fg2);cursor:pointer;
+  padding:6px 13px;border-radius:7px;font:inherit;font-size:13px;
+}
+.seg button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
+.pane{display:none;margin-top:10px}
+.pane.on{display:block}
+.drop{
+  border:1.5px dashed var(--line);border-radius:10px;padding:22px;text-align:center;
+  color:var(--fg3);font-size:14px;cursor:pointer;transition:.15s;background:var(--panel2);
+}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--accent);background:var(--accent2)}
+input[type=text],input[type=number],select{
+  width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--fg);font:inherit;font-size:14px;
+}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--fg2);cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--accent)}
+.btn{
+  appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--fg);
+  padding:10px 20px;border-radius:9px;font:inherit;font-size:14px;cursor:pointer;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.1);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.sm{padding:6px 12px;font-size:13px}
+
+/* ---------- log ---------- */
+.term{
+  background:var(--term);color:var(--termfg);border-radius:10px;padding:14px 16px;
+  font:12.5px/1.55 ui-monospace,Consolas,"Cascadia Mono","Courier New",monospace;
+  max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:12px 0 0;
+}
+.term .ln{display:block}
+.term .ln.step{color:#8ab4ff;font-weight:600}
+.term .ln.err{color:#ff8f8f}
+.term .ln.ok{color:#5fd7a0}
+.term .ln.cmd{color:#c8b6ff}
+
+/* ---------- outputs ---------- */
+.vids{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(268px,1fr))}
+.vid{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.vid video{width:100%;display:block;background:#000;aspect-ratio:16/10;object-fit:contain}
+.vid .meta{padding:10px 12px}
+.vid .nm{font-size:13px;font-weight:600;word-break:break-all;line-height:1.35}
+.vid .sub{font-size:12px;color:var(--fg3);margin-top:3px}
+.banner{
+  border-radius:10px;padding:12px 15px;font-size:14px;margin:12px 0;border:1px solid;
+}
+.banner.info{background:var(--accent2);border-color:var(--accent);color:var(--fg)}
+.banner.warn{background:transparent;border-color:var(--warn);color:var(--warn)}
+.banner.err{background:transparent;border-color:var(--err);color:var(--err)}
+.hide{display:none !important}
+code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:13px;
+  font-family:ui-monospace,Consolas,monospace}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="brand">音乐驱动 3D 舞蹈生成 · 本地工作台
+      <small>Bailando (CVPR2022) · EDGE (CVPR2023) · LODGE (CVPR2024)</small>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill"><span class="dot idle" id="dot"></span><span id="statusText">空闲</span></span>
+    <button class="btn sm" id="themeBtn" title="切换深浅色">◐</button>
+    <button class="btn sm" id="quitBtn">关闭工作台</button>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="on">概览</button>
+    <button data-tab="edge">EDGE</button>
+    <button data-tab="lodge">LODGE</button>
+    <button data-tab="bailando">Bailando</button>
+    <button data-tab="library">成品库</button>
+  </nav>
+</header>
+
+<div class="wrap">
+
+<div class="banner warn hide" id="offline">
+  <b>连不上工作台服务。</b>这个页面必须由服务端提供才能用 ——
+  请回到「跳舞模型」文件夹，双击 <code>启动工作台.bat</code>，
+  浏览器会自动打开正确的地址（<code>http://127.0.0.1:18066/</code>）。
+</div>
+
+<!-- ============================ 概览 ============================ -->
+<section id="tab-overview">
+  <h2>这三个东西是什么</h2>
+  <p>都是"给一段音乐，让电脑自己编出一支舞"的学术模型。三个都是论文的官方代码，跑在同一张显卡上。
+     区别是年代、数据集和好不好用。</p>
+
+  <div class="banner info">
+    <b>先看这一条：</b>三个模型都要独占显卡，所以工作台同一时间只允许跑一个任务。
+    想跑下一个，等上一个结束。
+  </div>
+
+  <div class="grid g3" style="margin-top:18px">
+    <div class="card">
+      <span class="tag">CVPR 2023 · 最推荐</span>
+      <h3>EDGE</h3>
+      <p>通用性最好。喂它<b>任意一段音乐</b>就行，它会生成一支跟着节奏跳的舞，还会自动把音乐合进视频里。</p>
+      <dl class="kv">
+        <dt>输入</dt><dd>任意 wav 音乐</dd>
+        <dt>输出</dt><dd>带音轨的 mp4，640×480，约 30 秒</dd>
+        <dt>耗时</dt><dd>约 3~6 分钟</dd>
+      </dl>
+      <button class="btn primary sm go" data-tab="edge">去用 EDGE</button>
+    </div>
+    <div class="card">
+      <span class="tag">CVPR 2024 · 最新</span>
+      <h3>LODGE</h3>
+      <p>最新的一代，在 FineDance <b>专业舞者数据集</b>上训练。可以额外指定舞种风格，生成的动作更"像人跳的"。</p>
+      <dl class="kv">
+        <dt>输入</dt><dd>任意 wav 音乐 + 一个舞种标签</dd>
+        <dt>输出</dt><dd>带音轨的 mp4，960×960</dd>
+        <dt>耗时</dt><dd>约 3~8 分钟</dd>
+      </dl>
+      <button class="btn primary sm go" data-tab="lodge">去用 LODGE</button>
+    </div>
+    <div class="card">
+      <span class="tag gray">CVPR 2022 · 参考</span>
+      <h3>Bailando</h3>
+      <p>最早的一代。<b>不能喂自己的音乐</b>——它只认仓库自带的 40 条测试序列，而且出来的视频没有声音。</p>
+      <dl class="kv">
+        <dt>输入</dt><dd>40 条内置序列里选一条</dd>
+        <dt>输出</dt><dd>无声 mp4，960×540，60fps</dd>
+        <dt>耗时</dt><dd>一条约 3 分钟</dd>
+      </dl>
+      <button class="btn primary sm go" data-tab="bailando">去用 Bailando</button>
+    </div>
+  </div>
+
+  <h2>怎么用（三步）</h2>
+  <div class="card">
+    <ul class="tight">
+      <li><b>1. 选模型</b> —— 想省事就用 EDGE；想指定舞种就用 LODGE。</li>
+      <li><b>2. 给音乐</b> —— 可以用仓库自带的示例音乐、上传一个文件、或者直接填本地文件的完整路径。</li>
+      <li><b>3. 点开始</b> —— 下面的日志会实时滚动，跑完自动出现播放器。</li>
+    </ul>
+    <p class="muted">跑过的成品不会丢，都在「成品库」标签页里，可以随时回看。</p>
+  </div>
+
+  <h2>几个省事的提醒</h2>
+  <div class="card">
+    <ul class="tight">
+      <li><b>杀毒软件会拖慢它。</b>火绒的实时扫描会让写文件变得很慢（Bailando 那边实测慢了十倍以上）。
+          把本项目整个文件夹加进火绒的信任区会明显变快。</li>
+      <li><b>EDGE 每次结果都不一样。</b>它是从音乐里<b>随机</b>挑一段来生成的，同一首歌跑两次会得到两支不同的舞。想要满意的就多跑几次。</li>
+      <li><b>音乐别太短。</b>EDGE 至少要 8 秒，而且生成长度会被自动限制在"音乐时长 − 2.5 秒"以内。</li>
+      <li><b>关掉页面 = 关掉工作台。</b>页面每 2 秒发一次心跳，关掉页面后服务会自己退出。
+          如果还有任务在跑，它会先把任务跑完再退出。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ EDGE ============================ -->
+<section id="tab-edge" class="hide">
+  <h2>EDGE <span class="tag">CVPR 2023</span> <span class="tag gray">推荐先用这个</span></h2>
+  <p>把任意一段音乐变成一支 3D 舞蹈，并自动把音乐合成到视频里。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">它在后台干了什么</h3>
+    <ol class="tight" style="padding-left:22px">
+      <li>把你的音乐切成 <b>5 秒一段、步长 2.5 秒</b>的小片；</li>
+      <li>用 OpenAI Jukebox 把每一片转成音频特征（第一次要往显存里读约 10GB 的权重，这是最慢的一步）；</li>
+      <li>从这些片里<b>随机挑一段连续的</b>，喂给扩散模型，逐步"去噪"出一段 3D 动作；</li>
+      <li>把动作渲染成骨架动画，再用 ffmpeg 把原音乐贴回去。</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <label class="fl">音乐来源</label>
+    <div class="seg" data-seg="edge">
+      <button data-kind="demo" class="on">内置示例</button>
+      <button data-kind="upload">上传文件</button>
+      <button data-kind="path">本地路径</button>
+    </div>
+
+    <div class="pane on" data-pane="edge-demo">
+      <p class="muted" style="margin:0">用仓库自带的 <code>EDGE/demo_music/demo_beat.wav</code>（一段 30 秒的鼓点），
+        适合先验证工作台能不能跑通。</p>
+    </div>
+
+    <div class="pane" data-pane="edge-upload">
+      <div class="drop" data-drop="edge">
+        把音频文件拖到这里，或者点一下选文件<br>
+        <span class="muted">支持 wav / mp3 / m4a / flac，非 wav 会自动转成 wav</span>
+      </div>
+      <input type="file" accept="audio/*" class="hide" data-file="edge">
+      <p class="muted" data-picked="edge"></p>
+    </div>
+
+    <div class="pane" data-pane="edge-path">
+      <input type="text" data-path="edge" placeholder="例如 G:\音乐\mysong.wav">
+      <p class="muted">直接填本机音频文件的完整路径，不会复制文件，适合大文件。</p>
+    </div>
+
+    <label class="fl">生成长度（秒）</label>
+    <input type="number" data-num="edge-out" value="30" min="5" max="60" step="5" style="max-width:180px">
+    <p class="muted">默认 30 秒。会自动下调到「音乐时长 − 2.5 秒」以内，否则模型取不满一个时间窗。</p>
+
+    <label class="fl">选项</label>
+    <label class="chk"><input type="checkbox" data-chk="edge-cache">
+      缓存音乐特征（下次跑同一首会省掉特征提取，但第一次会慢一点）</label>
+
+    <div class="row" style="margin-top:22px">
+      <button class="btn primary" id="runEdge">开始生成</button>
+      <span class="muted" id="edgeHint"></span>
+    </div>
+  </div>
+
+  <div id="edgeJob"></div>
+</section>
+
+<!-- ============================ LODGE ============================ -->
+<section id="tab-lodge" class="hide">
+  <h2>LODGE <span class="tag">CVPR 2024</span> <span class="tag gray">最新</span></h2>
+  <p>最新的一代，在 FineDance 专业舞者数据集上训练。除了音乐，还能指定<b>舞种风格</b>。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">它在后台干了什么</h3>
+    <ol class="tight" style="padding-left:22px">
+      <li>把你的音乐转成 35 维的节奏 / 音色特征；</li>
+      <li>先粗生成一段 <b>1024 帧（约 34 秒）</b>的整支舞 —— 这一步叫 Global；</li>
+      <li>再按 256 帧一段<b>逐段精修</b>，把动作打磨得更自然 —— 这一步叫 Local；</li>
+      <li>最后渲染成骨架视频并合上音乐。</li>
+    </ol>
+    <div class="banner warn">
+      <b>一个内部细节，说明白免得你疑惑：</b>仓库自带的 FineDance 数据只保留了<b>一首歌（编号 063）</b>的风格标签文件。
+      所以工作台是先把你的音乐临时"顶替"成 063、按你选的风格写一份标签，跑完再把原文件还原回去。
+      你的音乐文件本身不会被改动。
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="fl">音乐来源</label>
+    <div class="seg" data-seg="lodge">
+      <button data-kind="demo" class="on">内置示例</button>
+      <button data-kind="upload">上传文件</button>
+      <button data-kind="path">本地路径</button>
+    </div>
+
+    <div class="pane on" data-pane="lodge-demo">
+      <p class="muted" style="margin:0">用仓库自带的 FineDance 示例曲（约 32 秒）。</p>
+    </div>
+    <div class="pane" data-pane="lodge-upload">
+      <div class="drop" data-drop="lodge">
+        把音频文件拖到这里，或者点一下选文件<br>
+        <span class="muted">支持 wav / mp3 / m4a / flac，非 wav 会自动转成 wav</span>
+      </div>
+      <input type="file" accept="audio/*" class="hide" data-file="lodge">
+      <p class="muted" data-picked="lodge"></p>
+    </div>
+    <div class="pane" data-pane="lodge-path">
+      <input type="text" data-path="lodge" placeholder="例如 G:\音乐\mysong.wav">
+      <p class="muted">直接填本机音频文件的完整路径，不会复制文件。</p>
+    </div>
+
+    <label class="fl">舞种风格</label>
+    <select data-sel="lodge-style"></select>
+    <p class="muted">这个标签是真的会改变生成结果的 —— 同一个音乐配不同风格，跳出来不一样。</p>
+
+    <label class="fl">选项</label>
+    <label class="chk"><input type="checkbox" data-chk="lodge-render" checked>
+      跑完顺便渲染成视频（不勾只生成动作数据，快一些但没有视频）</label>
+
+    <div class="row" style="margin-top:22px">
+      <button class="btn primary" id="runLodge">开始生成</button>
+      <span class="muted" id="lodgeHint"></span>
+    </div>
+  </div>
+
+  <div id="lodgeJob"></div>
+</section>
+
+<!-- ============================ Bailando ============================ -->
+<section id="tab-bailando" class="hide">
+  <h2>Bailando <span class="tag">CVPR 2022</span> <span class="tag gray">参考用</span></h2>
+  <p>最早的一代，在 AIST++ 数据集上训练。<b>它不能吃你自己的音乐</b>——只认仓库自带的 40 条测试序列。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">为什么不能用自己的音乐</h3>
+    <ul class="tight">
+      <li>它的音乐特征提取器和测试流程是<b>写死在 AIST++ 那 40 条序列上</b>的，没有"随便给一首歌"的入口。</li>
+      <li>AIST++ 的音频文件没有随仓库发布，所以生成的视频<b>只有骨架、没有声音</b>。</li>
+      <li>真正有用的场景是<b>对照</b>：同一批数据上，看看 2022 年的模型和 EDGE / LODGE 差多少。</li>
+    </ul>
+    <div class="banner info">
+      下面这 40 条序列的<b>动作数据（pkl）已经在仓库里了</b>，所以"渲染视频"是纯出图，不跑模型 ——
+      一条约 <b>3 分钟</b>，40 条全渲染约 15 分钟。
+      如果你要连动作一起重新生成，那是另一回事 —— 约 1.5~2 小时，当前工作台没有开放这个入口。
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="fl">选一条序列</label>
+    <select data-sel="bailando-dance" style="max-width:420px"></select>
+    <p class="muted" data-bailando-stat></p>
+
+    <div class="row" style="margin-top:22px">
+      <button class="btn primary" id="runBailando">渲染这一条</button>
+      <button class="btn" id="runBailandoAll">全部重新渲染（约 15 分钟）</button>
+    </div>
+  </div>
+
+  <div id="bailandoJob"></div>
+</section>
+
+<!-- ============================ 成品库 ============================ -->
+<section id="tab-library" class="hide">
+  <h2>成品库</h2>
+  <p>所有已经生成过的视频，最新的排在最前面。点播放器就能直接看。</p>
+  <div class="row" style="margin:14px 0">
+    <div class="seg" id="libFilter">
+      <button data-m="all" class="on">全部</button>
+      <button data-m="EDGE">EDGE</button>
+      <button data-m="LODGE">LODGE</button>
+      <button data-m="Bailando">Bailando</button>
+    </div>
+    <span class="muted" id="libStat"></span>
+  </div>
+  <div class="vids" id="libGrid"></div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+/* ============================ 基础工具 ============================ */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const t = await r.text();
+  let j = null;
+  try { j = JSON.parse(t); } catch (e) { j = { ok: false, error: t.slice(0, 300) }; }
+  if (!r.ok && j && !j.error) j.error = "HTTP " + r.status;
+  return j;
+}
+
+/* ============================ 主题 ============================ */
+(function () {
+  const saved = localStorage.getItem("wb-theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+  $("#themeBtn").onclick = () => {
+    const cur = document.documentElement.dataset.theme;
+    const dark = cur ? cur === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem("wb-theme", next);
+  };
+})();
+
+/* ============================ 状态 ============================ */
+const S = {
+  state: null,
+  job: null,          // {id, status, next, videos, error, title, model}
+  cursor: 0,
+  timer: null,
+  music: { edge: { kind: "demo", upload: null, path: "" },
+           lodge: { kind: "demo", upload: null, path: "" } },
+  libFilter: "all",
+};
+
+/* ============================ 标签页 ============================ */
+function showTab(name) {
+  $$("nav.tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  ["overview", "edge", "lodge", "bailando", "library"].forEach(t => {
+    $("#tab-" + t).classList.toggle("hide", t !== name);
+  });
+  if (name === "library") renderLibrary();
+  location.hash = name;
+}
+$$("nav.tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+$$("button.go").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+showTab((location.hash || "#overview").slice(1));
+
+/* ============================ 音乐选择控件 ============================ */
+$$(".seg[data-seg]").forEach(seg => {
+  const model = seg.dataset.seg;
+  seg.querySelectorAll("button").forEach(btn => {
+    btn.onclick = () => {
+      S.music[model].kind = btn.dataset.kind;
+      seg.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
+      $$("[data-pane^='" + model + "-']").forEach(p => {
+        p.classList.toggle("on", p.dataset.pane === model + "-" + btn.dataset.kind);
+      });
+      updateHints();
+    };
+  });
+});
+
+// 拖放 / 点击上传
+$$(".drop[data-drop]").forEach(drop => {
+  const model = drop.dataset.drop;
+  const input = $("[data-file='" + model + "']");
+  drop.onclick = () => input.click();
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => {
+    e.preventDefault(); drop.classList.remove("over");
+    if (e.dataTransfer.files.length) upload(model, e.dataTransfer.files[0]);
+  };
+  input.onchange = () => { if (input.files.length) upload(model, input.files[0]); };
+});
+
+async function upload(model, file) {
+  const box = $("[data-picked='" + model + "']");
+  box.textContent = "正在上传 " + file.name + " …";
+  const r = await api("/api/upload", {
+    method: "POST", body: file,
+    headers: { "X-Filename": encodeURIComponent(file.name) },
+  });
+  if (!r.ok) { box.textContent = "上传失败：" + (r.error || "未知错误"); return; }
+  S.music[model].upload = r.path;
+  box.textContent = "已就绪：" + r.name +
+    (r.duration ? "（" + r.duration.toFixed(1) + " 秒）" : "");
+  // 上传完自动切到"上传文件"这一档，省得用户再点一次
+  const seg = $(".seg[data-seg='" + model + "']");
+  const btn = seg.querySelector("[data-kind='upload']");
+  if (btn) btn.click();
+}
+
+function updateHints() {
+  const st = S.state || {};
+  const d = st.demos || {};
+  const e = S.music.edge, l = S.music.lodge;
+  const pick = (m, demo) => {
+    if (m.kind === "demo") return demo ? "将使用内置示例音乐" : "内置示例音乐缺失";
+    if (m.kind === "upload") return m.upload ? "已选：" + m.upload.split(/[\\/]/).pop() : "还没选文件";
+    return m.path ? "路径：" + m.path : "还没填路径";
+  };
+  $("#edgeHint").textContent = pick(e, d.edge);
+  $("#lodgeHint").textContent = pick(l, d.lodge);
+}
+
+/* ============================ 运行 ============================ */
+function musicPayload(model) {
+  const m = S.music[model];
+  const p = { music_kind: m.kind };
+  if (m.kind === "upload") p.music_upload = m.upload || "";
+  if (m.kind === "path") p.music_path = m.path || "";
+  return p;
+}
+
+async function run(model, extra, btn) {
+  const body = Object.assign({ model: model }, musicPayload(model), extra || {});
+  if (btn) btn.disabled = true;
+  const r = await api("/api/run", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (btn) btn.disabled = false;
+  if (!r.ok) { alert(r.error || "启动失败"); return; }
+  S.cursor = 0; S.job = null;
+  attachJob(r.job, r.title, model);
+  if (r.notes && r.notes.length) {
+    const box = $("#" + model + "Job");
+    box.innerHTML = '<div class="banner warn">' + r.notes.map(esc).join("<br>") + "</div>" + box.innerHTML;
+  }
+  await refresh(true);
+}
+
+$("#runEdge").onclick = e => run("edge", {
+  out_length: parseInt($("[data-num='edge-out']").value || "30", 10),
+  cache: $("[data-chk='edge-cache']").checked,
+}, e.target);
+
+$("#runLodge").onclick = e => run("lodge", {
+  style: $("[data-sel='lodge-style']").value,
+  render: $("[data-chk='lodge-render']").checked,
+}, e.target);
+
+$("#runBailando").onclick = e => {
+  const d = $("[data-sel='bailando-dance']").value;
+  if (!d) { alert("请先选一条序列"); return; }
+  run("bailando", { dance: d }, e.target);
+};
+$("#runBailandoAll").onclick = e => {
+  if (!confirm("会把 40 条序列全部重新渲染一遍，大约 15 分钟。确定吗？")) return;
+  run("bailando", { dance: "__ALL__" }, e.target);
+};
+
+/* 路径输入框 */
+$$("[data-path]").forEach(inp => {
+  inp.oninput = () => { S.music[inp.dataset.path].path = inp.value.trim(); updateHints(); };
+});
+
+/* ============================ 任务面板 ============================ */
+function attachJob(id, title, model) {
+  S.job = { id: id, status: "running", next: 0, videos: [], error: "", title: title, model: model };
+  S.cursor = 0;
+  const box = $("#" + model + "Job");
+  box.innerHTML =
+    '<div class="card">' +
+      '<div class="row"><b id="jobTitle-' + model + '"></b>' +
+        '<span class="spacer" style="flex:1"></span>' +
+        '<span class="tag" id="jobStat-' + model + '">运行中</span></div>' +
+      '<div class="term" id="jobLog-' + model + '"></div>' +
+      '<div id="jobRes-' + model + '" class="hide" style="margin-top:16px"></div>' +
+    '</div>';
+  $("#jobTitle-" + model).textContent = title;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function lineClass(t) {
+  if (/^=====/.test(t)) return "step";
+  if (/^\[失败\]|^\[错误\]|Traceback|Error:|错误/.test(t)) return "err";
+  if (/^\[完成\]|^\[清理\]|ALL_DONE|Done$|^OK$/.test(t)) return "ok";
+  if (/^> /.test(t)) return "cmd";
+  return "";
+}
+
+function appendLog(model, lines) {
+  const el = $("#jobLog-" + model);
+  if (!el || !lines.length) return;
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  const frag = document.createDocumentFragment();
+  lines.forEach(t => {
+    const d = document.createElement("span");
+    d.className = "ln " + lineClass(t);
+    d.textContent = t;
+    frag.appendChild(d);
+  });
+  el.appendChild(frag);
+  while (el.childNodes.length > 4000) el.removeChild(el.firstChild);
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function renderJobResult(model, j) {
+  const box = $("#jobRes-" + model);
+  if (!box) return;
+  const st = $("#jobStat-" + model);
+  if (st) {
+    st.className = "tag " + (j.status === "done" ? "ok" : j.status === "failed" ? "warn" : "gray");
+    st.textContent = j.status === "done" ? "已完成" : j.status === "failed" ? "失败" : "运行中";
+  }
+  if (j.status === "failed" && j.error) {
+    box.classList.remove("hide");
+    box.innerHTML = '<div class="banner err">失败原因：' + esc(j.error) + "</div>";
+  }
+  if (j.videos && j.videos.length) {
+    box.classList.remove("hide");
+    const show = j.videos.slice(0, 12);
+    const more = j.videos.length - show.length;
+    box.innerHTML = '<h3 style="margin-top:0">生成结果</h3><div class="vids">' +
+      show.map(v =>
+        '<div class="vid"><video controls preload="metadata" src="' + v.url + '"></video>' +
+        '<div class="meta"><div class="nm">' + esc(v.name) + "</div>" +
+        '<div class="sub"><a href="' + v.url + '" download>下载</a></div></div></div>'
+      ).join("") + "</div>" +
+      (more > 0 ? '<p class="muted">还有 ' + more + ' 个视频，去「成品库」标签页看。</p>' : "");
+  }
+}
+
+/* ============================ 成品库 ============================ */
+function fmtSize(n) {
+  if (n > 1048576) return (n / 1048576).toFixed(1) + " MB";
+  if (n > 1024) return (n / 1024).toFixed(0) + " KB";
+  return n + " B";
+}
+function fmtTime(t) {
+  const d = new Date(t * 1000);
+  const p = x => String(x).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+    " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+
+function renderLibrary() {
+  const all = (S.state && S.state.outputs) || [];
+  const list = S.libFilter === "all" ? all : all.filter(v => v.model === S.libFilter);
+  $("#libStat").textContent = "共 " + list.length + " 个视频";
+  const g = $("#libGrid");
+  if (!list.length) {
+    g.innerHTML = '<p class="muted">这里还是空的。去上面跑一个任务吧。</p>';
+    return;
+  }
+  g.innerHTML = list.map(v =>
+    '<div class="vid">' +
+      // 成品库可能有几十个视频，preload=none 避免一次性拉几十个元数据把页面卡住
+      '<video controls preload="none" src="' + v.url + '"></video>' +
+      '<div class="meta">' +
+        '<div class="nm">' + esc(v.name) + "</div>" +
+        '<div class="sub"><span class="tag gray">' + v.model + "</span> " +
+          fmtSize(v.size) + " · " + fmtTime(v.mtime) + "</div>" +
+        '<div class="sub"><a href="' + v.url + '" download>下载</a></div>' +
+      "</div>" +
+    "</div>").join("");
+}
+
+$$("#libFilter button").forEach(b => b.onclick = () => {
+  S.libFilter = b.dataset.m;
+  $$("#libFilter button").forEach(x => x.classList.toggle("on", x === b));
+  renderLibrary();
+});
+
+/* ============================ 轮询 ============================ */
+function setStatus(busy, title) {
+  $("#dot").className = "dot " + (busy ? "busy" : "idle");
+  $("#statusText").textContent = busy ? ("运行中 · " + (title || "")) : "空闲";
+}
+
+let failCount = 0;
+async function refresh(force) {
+  const st = await api("/api/state");
+  if (!st || st.error) {
+    failCount++;
+    // 连不上服务（比如用户直接双击了 index.html）—— 明确告诉他要怎么做
+    if (failCount >= 2) $("#offline").classList.remove("hide");
+    return;
+  }
+  failCount = 0;
+  $("#offline").classList.add("hide");
+  {
+    S.state = st;
+    // 下拉框只在第一次填充，别打断用户的选择
+    const selS = $("[data-sel='lodge-style']");
+    if (selS && !selS.options.length && st.styles) {
+      selS.innerHTML = st.styles.map(s => '<option value="' + s.value + '">' + s.label + "</option>").join("");
+    }
+    const selD = $("[data-sel='bailando-dance']");
+    if (selD && !selD.options.length && st.dances) {
+      selD.innerHTML = st.dances.map(d =>
+        '<option value="' + d.name + '">' + d.name + (d.video ? "（已有视频）" : "") + "</option>").join("");
+      const done = st.dances.filter(d => d.video).length;
+      $("[data-bailando-stat]").textContent =
+        "40 条里有 " + done + " 条已经渲染过视频（选它也能重新渲染，会覆盖）。";
+    }
+    updateHints();
+    if ($("#tab-library") && !$("#tab-library").classList.contains("hide")) renderLibrary();
+
+    // 服务端有任务、但本地没有 → 可能是刚刷新页面，接回去
+    if (st.busy && (!S.job || S.job.id !== st.busy)) {
+      const j = (st.jobs || []).find(x => x.id === st.busy);
+      if (j) { attachJob(j.id, j.title, j.model); S.cursor = 0; }
+    }
+    if (!st.busy && S.job && S.job.status === "running" && force) {
+      // 任务被别处结束了，下一轮 job 轮询会拿到最终状态
+    }
+    setStatus(!!st.busy, st.busy && (st.jobs || []).find(x => x.id === st.busy)
+      ? (st.jobs.find(x => x.id === st.busy).title) : "");
+  }
+
+  if (S.job && S.job.status === "running") {
+    const j = await api("/api/job?id=" + S.job.id + "&from=" + S.cursor);
+    if (j && !j.error) {
+      S.cursor = j.next;
+      appendLog(S.job.model, j.lines || []);
+      S.job.status = j.status;
+      S.job.videos = j.videos || [];
+      S.job.error = j.error || "";
+      renderJobResult(S.job.model, S.job);
+      if (j.status !== "running") refresh(false);
+    }
+  }
+}
+
+// 心跳：页面活着，服务就活着
+async function ping() { try { await api("/api/ping", { method: "POST" }); } catch (e) {} }
+ping();
+setInterval(ping, 2000);
+setInterval(() => refresh(false), 3000);
+refresh(true);
+
+$("#quitBtn").onclick = async () => {
+  if (!confirm("关闭工作台？页面会失效，需要重新双击启动脚本。")) return;
+  await api("/api/quit", { method: "POST" });
+  document.body.innerHTML =
+    '<div class="wrap"><div class="card" style="margin-top:60px;text-align:center">' +
+    "<h2>工作台已关闭</h2><p>可以关掉这个页面了。想再用就双击「启动工作台.bat」。</p></div></div>";
+};
+</script>
+</body>
+</html>

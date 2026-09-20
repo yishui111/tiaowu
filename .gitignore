@@ -1,0 +1,32 @@
+# =====================================================================
+# 本仓库只提交我自己写的部分：网页工作台、补丁/渲染/可视化工具、文档。
+# 三个引擎仓库本体（Bailando / EDGE / LODGE）、jukebox / jukemirlib、
+# venv、CUDA wheel、ffmpeg、数据集与模型权重都不入库，按 README.md 部署。
+# =====================================================================
+
+# ---- 三个引擎 + 两个依赖库（上游项目本体）----
+/Bailando/*
+/EDGE/*
+!/EDGE/pytorch3d/
+/LODGE/*
+!/LODGE/pytorch3d/
+/jukebox/*
+/jukemirlib/*
+
+# ---- EDGE / LODGE 里我手写的 pytorch3d 纯 torch 复刻，要入库，但排除缓存 ----
+EDGE/pytorch3d/**/__pycache__/
+LODGE/pytorch3d/**/__pycache__/
+
+# ---- 大件依赖：wheel 缓存与 ffmpeg（重装时按 README 重新获取）----
+/wheels/
+/bin/
+
+# ---- 运行产物 / 本地状态 ----
+/_workbench_out/
+tools/_stash/
+tools/_uploads/
+tools/_live.log
+tools/_chrome_profile/
+.workbuddy-ai/
+__pycache__/
+*.log
