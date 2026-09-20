@@ -33,7 +33,15 @@ if not defined PY goto :findlocal
 goto :run
 
 :findlocal
-rem 退而求其次：机器上已知的两个 Python
+rem 退而求其次：Windows 自带的 py 启动器（装了官方 Python 就有）
+set "PY=py"
+py -c "import sys" >nul 2>&1
+if errorlevel 1 goto :findlocal2
+goto :run
+
+:findlocal2
+rem 再不行：本机已知的几个 Python 安装位置
+set "PY="
 if exist "C:\Users\dapanji\AppData\Local\Programs\Python\Python310\python.exe" set "PY=C:\Users\dapanji\AppData\Local\Programs\Python\Python310\python.exe"
 if not defined PY if exist "C:\Users\dapanji\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe" set "PY=C:\Users\dapanji\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
 if not defined PY goto :nopy

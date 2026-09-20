@@ -8,7 +8,7 @@
 |---|---|---|
 | `Bailando/` | Bailando 2（CVPR2022），音乐 → 舞蹈，权重最全，实测最稳 | [andyt-ai/Bailando](https://github.com/andyt-ai/Bailando) |
 | `EDGE/` | EDGE（CVPR2023），Jukebox 特征 + 扩散模型，同一首歌每次生成的舞都不一样 | [Stanford-TML/EDGE](https://github.com/Stanford-TML/EDGE) |
-| `LODGE/` | LODGE（CVPR2024），全局+局部两级生成，FineDance 数据集 | [meiyuma/LODGE](https://github.com/meiyuma/LODGE) |
+| `LODGE/` | LODGE（CVPR2024），全局+局部两级生成，FineDance 数据集。我加的 `infer_lodge.py` 推理入口随仓库走 | [meiyuma/LODGE](https://github.com/meiyuma/LODGE) |
 | `jukebox/` `jukemirlib/` | OpenAI Jukebox（EDGE 的音乐特征提取依赖） | [rodrigo-castellon/jukebox](https://github.com/rodrigo-castellon/jukebox) |
 | `tools/` `启动工作台.bat` | **我写的工作台**（本仓库的核心） | — |
 | `_tools_*.py` | 我写的补丁/渲染/可视化工具（见「四、我的工具脚本」） | — |

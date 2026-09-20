@@ -123,6 +123,17 @@ def wav_duration(path):
         return None
 
 
+def find_ffmpeg():
+    """优先用项目自带的 bin\ffmpeg.exe，其次系统 PATH。"""
+    local = os.path.join(ROOT, "bin", "ffmpeg.exe")
+    if os.path.isfile(local):
+        return local
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+
+FFMPEG = find_ffmpeg()
+
+
 def ffmpeg_to_wav(raw_bytes, dst):
     """把上传的原始字节转成模型要的 wav。
 
@@ -130,12 +141,26 @@ def ffmpeg_to_wav(raw_bytes, dst):
     这一步（删文件在受限环境里可能被拦，而且同扩展名时还会踩到 Windows 的
     WinError 32「自己拷自己」）。
     """
-    exe = shutil.which("ffmpeg") or "ffmpeg"
-    cmd = [exe, "-y", "-loglevel", "error", "-i", "pipe:0",
+    cmd = [FFMPEG, "-y", "-loglevel", "error", "-i", "pipe:0",
            "-vn", "-ac", "2", "-ar", "44100", "-c:a", "pcm_s16le", dst]
     p = subprocess.run(cmd, input=raw_bytes, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if p.returncode != 0 or not os.path.exists(dst):
         raise RuntimeError("转成 wav 失败：%s" % p.stdout.decode("utf-8", "replace")[-400:])
+
+
+def clean_stale_uploads(days=7):
+    """tools/_uploads 只当暂存用：清掉 N 天前的旧上传，防止无限堆积。"""
+    now = time.time()
+    removed = 0
+    for f in glob.glob(os.path.join(UPLOADS, "*")):
+        try:
+            if os.path.isfile(f) and now - os.path.getmtime(f) > days * 86400:
+                os.remove(f)
+                removed += 1
+        except OSError:
+            pass
+    if removed:
+        print("[工作台] 已清理 %d 个 %d 天前的旧上传" % (removed, days))
 
 
 def ensure_demo(which):
@@ -171,6 +196,8 @@ def _run_streaming(job, cmd, cwd):
     env = dict(os.environ)
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUNBUFFERED"] = "1"
+    # 子进程（含引擎 venv 里的渲染脚本）也要能找到 ffmpeg：把项目 bin\ 排到最前
+    env["PATH"] = os.path.join(ROOT, "bin") + os.pathsep + env.get("PATH", "")
     proc = subprocess.Popen(
         cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL, bufsize=0, env=env,
@@ -383,7 +410,10 @@ def plan_lodge(params, jid):
         if not cands:
             raise RuntimeError("没找到生成出来的动作文件（%s.npy）" % LODGE_SONG)
         npy = max(cands, key=os.path.getmtime)
-        _log(job, "动作文件：%s" % npy)
+        if os.path.getmtime(npy) < job["started"] - 5:
+            _log(job, "[警告] 没找到本次新生成的动作文件，用的是历史遗留文件（生成的舞可能对不上这段音乐）：%s" % npy)
+        else:
+            _log(job, "动作文件：%s" % npy)
         out_mp4 = os.path.join(final_dir, "%s_%s_%s.mp4" % (style, stem, jid))
         box["out_mp4"] = out_mp4
         return ("渲染骨架视频 + 合音乐",
@@ -846,6 +876,7 @@ def main():
 
     for p in (UPLOADS, ASSETS, STASH, OUTROOT):
         os.makedirs(p, exist_ok=True)
+    clean_stale_uploads()
 
     # ★ Windows 上 HTTPServer 默认带 SO_REUSEADDR，它允许**两个进程同时绑定同一个端口**
     #   （不像 Linux 只对 TIME_WAIT 生效）。这样双击两次 bat 会起两个服务，

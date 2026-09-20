@@ -10,6 +10,7 @@
 !/EDGE/pytorch3d/
 /LODGE/*
 !/LODGE/pytorch3d/
+!/LODGE/infer_lodge.py
 /jukebox/*
 /jukemirlib/*
 
